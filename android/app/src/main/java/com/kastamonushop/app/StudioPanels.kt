@@ -1708,7 +1708,7 @@ internal fun DrawMenuPanel(
 internal fun SelectMenuPanel(
     vm: EditorViewModel,
     state: EditorUiState,
-    selectScrollState: androidx.compose.foundation.ScrollState,
+    onOpenToolPicker: () -> Unit = {},
     onOpenContentAwareFill: () -> Unit = {},
     onOpenContentAwareMove: () -> Unit = {},
     onOpenSelectSky: () -> Unit = {},
@@ -1717,78 +1717,229 @@ internal fun SelectMenuPanel(
     onOpenSelectModify: () -> Unit = {},
     onClose: () -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 7.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+    var showActionsSheet by remember { mutableStateOf(false) }
+    var lastAddTool by remember { mutableStateOf(ActiveTool.SELECT_QUICK) }
+    LaunchedEffect(state.activeTool) {
+        if (state.activeTool == ActiveTool.SELECT_QUICK || state.activeTool == ActiveTool.SELECT_BRUSH_ADD) {
+            lastAddTool = state.activeTool
+        }
+    }
+
+    val (toolIcon, toolLabel) = when {
+        state.quickMaskMode -> Icons.Default.Masks to "Hızlı Maske"
+        state.activeTool == ActiveTool.SELECT_BRUSH_ADD -> Icons.Default.AddCircleOutline to "Seçim Fırçası"
+        state.activeTool == ActiveTool.SELECT_BRUSH_SUB -> Icons.Default.RemoveCircleOutline to "Seçimden Sil"
+        state.activeTool == ActiveTool.SELECT_WAND -> Icons.Default.AutoAwesome to "Sihirli Değnek"
+        state.activeTool == ActiveTool.SELECT_RECT -> Icons.Default.CropSquare to (if (state.selectEllipse) "Elips Seçim" else "Kutu Seçim")
+        state.activeTool == ActiveTool.SELECT_LASSO -> Icons.Default.Gesture to "Kement"
+        state.activeTool == ActiveTool.SELECT_MAGNETIC_LASSO -> Icons.Default.Timeline to "Manyetik"
+        else -> Icons.Default.AutoFixHigh to "Hızlı Seçim"
+    }
+
+    val isSubMode = when {
+        state.quickMaskMode -> state.colorHex.equals("#000000", ignoreCase = true)
+        state.activeTool == ActiveTool.SELECT_BRUSH_SUB -> true
+        else -> false
+    }
+    val hasSelection = state.selectionBounds != null
+
+    // Fixed 4-Slot Zero-Scroll Select Bar (matches Draw & Retouch ergonomics)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri", tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+
+        // Context Quick Toggle: Kutu <-> Elips OR Ekle+ <-> Sil-
+        val toggleActive = if (state.activeTool == ActiveTool.SELECT_RECT) state.selectEllipse else isSubMode
+        val toggleIcon = when {
+            state.activeTool == ActiveTool.SELECT_RECT -> if (state.selectEllipse) Icons.Default.RadioButtonUnchecked else Icons.Default.CropSquare
+            isSubMode -> Icons.Default.RemoveCircleOutline
+            else -> Icons.Default.AddCircleOutline
+        }
+        val toggleLabel = when {
+            state.activeTool == ActiveTool.SELECT_RECT -> if (state.selectEllipse) "Elips" else "Kutu"
+            isSubMode -> "Sil -"
+            else -> "Ekle +"
+        }
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = if (toggleActive) StudioV2Colors.AmberSoft else Color(0xFF1F222C),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (toggleActive) StudioV2Colors.Amber else Color(0xFF333848)),
+            modifier = Modifier
+                .height(36.dp)
+                .clickable {
+                    when {
+                        state.quickMaskMode -> {
+                            val nextHex = if (isSubMode) "#FFFFFF" else "#000000"
+                            vm.updateBrush(colorHex = nextHex)
+                            vm.setTool(ActiveTool.BRUSH)
+                        }
+                        state.activeTool == ActiveTool.SELECT_RECT -> vm.toggleSelectEllipse()
+                        isSubMode -> vm.setTool(lastAddTool)
+                        else -> vm.setTool(ActiveTool.SELECT_BRUSH_SUB)
+                    }
+                }
         ) {
-            IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
             Row(
-                modifier = Modifier.weight(1f).horizontalScroll(selectScrollState),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                SlimToolChip(Icons.Default.AutoFixHigh, "Akıllı", state.activeTool == ActiveTool.SELECT_QUICK) {
-                    vm.setTool(ActiveTool.SELECT_QUICK)
+                Icon(toggleIcon, contentDescription = null, tint = if (toggleActive) StudioV2Colors.Amber else Color(0xFFD5D9E4), modifier = Modifier.size(15.dp))
+                Text(toggleLabel, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+            }
+        }
+
+        // Center Active Selection Tool Capsule — opens Seç & Maske 2-column grid
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Color(0xFF232734),
+            border = androidx.compose.foundation.BorderStroke(1.dp, StudioV2Colors.Amber.copy(alpha = 0.65f)),
+            modifier = Modifier
+                .weight(1f)
+                .height(36.dp)
+                .clickable { onOpenToolPicker() }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(toolIcon, contentDescription = null, tint = StudioV2Colors.Amber, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(toolLabel, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(3.dp))
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(16.dp))
+            }
+        }
+
+        // Right Slot: Selection Actions Popover (when selection exists) OR Quick Mask toggle
+        if (hasSelection) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = StudioV2Colors.AmberSoft,
+                border = androidx.compose.foundation.BorderStroke(1.dp, StudioV2Colors.Amber),
+                modifier = Modifier
+                    .height(36.dp)
+                    .clickable { showActionsSheet = true }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.Bolt, contentDescription = "Seçim İşlemleri", tint = StudioV2Colors.Amber, modifier = Modifier.size(15.dp))
+                    Text("İşlemler", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
-                SlimToolChip(Icons.Default.AddCircleOutline, "Ekle+", state.activeTool == ActiveTool.SELECT_BRUSH_ADD) {
-                    vm.setTool(ActiveTool.SELECT_BRUSH_ADD)
-                }
-                SlimToolChip(Icons.Default.RemoveCircleOutline, "Sil-", state.activeTool == ActiveTool.SELECT_BRUSH_SUB) {
-                    vm.setTool(ActiveTool.SELECT_BRUSH_SUB)
-                }
-                SlimToolChip(Icons.Default.AutoAwesome, "Değnek", state.activeTool == ActiveTool.SELECT_WAND) {
-                    vm.setTool(ActiveTool.SELECT_WAND)
-                }
-                SlimToolChip(Icons.Default.CropSquare, if (state.selectEllipse) "Elips" else "Kutu", state.activeTool == ActiveTool.SELECT_RECT) {
-                    if (state.activeTool == ActiveTool.SELECT_RECT) vm.toggleSelectEllipse()
-                    else vm.setTool(ActiveTool.SELECT_RECT)
-                }
-                SlimToolChip(Icons.Default.Gesture, "Kement", state.activeTool == ActiveTool.SELECT_LASSO) {
-                    vm.setTool(ActiveTool.SELECT_LASSO)
-                }
-                SlimToolChip(Icons.Default.Timeline, "Manyetik", state.activeTool == ActiveTool.SELECT_MAGNETIC_LASSO) {
-                    vm.setTool(ActiveTool.SELECT_MAGNETIC_LASSO)
-                }
-                SlimToolChip(Icons.Default.PersonSearch, "Konuyu Seç", false) {
-                    vm.selectSubject()
-                }
-                SlimToolChip(Icons.Default.Cloud, "Gökyüzü", false) {
-                    onOpenSelectSky()
-                }
-                SlimToolChip(Icons.Default.ColorLens, "Renk Aralığı", false) {
-                    onOpenColorRange()
-                }
-                SlimToolChip(Icons.Default.CenterFocusStrong, "Odak Alanı", false) {
-                    onOpenFocusArea()
-                }
-                SlimToolChip(Icons.Default.Layers, "Hızlı Maske", state.quickMaskMode) {
-                    vm.toggleQuickMaskMode()
+            }
+        } else {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = if (state.quickMaskMode) StudioV2Colors.AmberSoft else Color(0xFF1F222C),
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (state.quickMaskMode) StudioV2Colors.Amber else Color(0xFF333848)),
+                modifier = Modifier
+                    .height(36.dp)
+                    .clickable { vm.toggleQuickMaskMode() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.Masks, contentDescription = "Hızlı Maske", tint = if (state.quickMaskMode) StudioV2Colors.Amber else Color(0xFFD5D9E4), modifier = Modifier.size(15.dp))
+                    Text("Maske", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Medium, maxLines = 1)
                 }
             }
         }
-        if (state.selectionBounds != null) {
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                ProPill(selected = false, onClick = { vm.layerViaCopy() }, label = { Text("Katmana Kopyala", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = { vm.selectInverse() }, label = { Text("Ters Çevir", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = onOpenSelectModify, label = { Text("Değiştir", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = onOpenContentAwareFill, label = { Text("İçerik Dolgu", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = onOpenContentAwareMove, label = { Text("Akıllı Taşı", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = { vm.contentAwareRemove() }, label = { Text("Hızlı Sil", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = { vm.clearSelection() }, label = { Text("Temizle", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = { vm.revealSelectionMask() }, label = { Text("Maskele", fontSize = 10.sp) })
-                ProPill(selected = false, onClick = { vm.deselect() }, label = { Text("Bırak", fontSize = 10.sp) })
+    }
+
+    if (showActionsSheet && hasSelection) {
+        AlertDialog(
+            onDismissRequest = { showActionsSheet = false },
+            containerColor = Color(0xFF181B24),
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text("Seçim İşlemleri", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SelectActionTile(Icons.Default.Masks, "Maskele", Modifier.weight(1f)) {
+                            showActionsSheet = false; vm.revealSelectionMask()
+                        }
+                        SelectActionTile(Icons.Default.ContentCopy, "Katmana Kopyala", Modifier.weight(1f)) {
+                            showActionsSheet = false; vm.layerViaCopy()
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SelectActionTile(Icons.Default.Tune, "Seçimi İncelt", Modifier.weight(1f)) {
+                            showActionsSheet = false; onOpenSelectModify()
+                        }
+                        SelectActionTile(Icons.Default.FlipToBack, "Ters Çevir", Modifier.weight(1f)) {
+                            showActionsSheet = false; vm.selectInverse()
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SelectActionTile(Icons.Default.AutoFixHigh, "İçerik Dolgu", Modifier.weight(1f)) {
+                            showActionsSheet = false; onOpenContentAwareFill()
+                        }
+                        SelectActionTile(Icons.Default.OpenWith, "Akıllı Taşı", Modifier.weight(1f)) {
+                            showActionsSheet = false; onOpenContentAwareMove()
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        SelectActionTile(Icons.Default.CleaningServices, "Hızlı Sil", Modifier.weight(1f)) {
+                            showActionsSheet = false; vm.contentAwareRemove()
+                        }
+                        SelectActionTile(Icons.Default.DeleteSweep, "Pikselleri Sil", Modifier.weight(1f), accent = Color(0xFFFF6B6B)) {
+                            showActionsSheet = false; vm.clearSelection()
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showActionsSheet = false }) {
+                    Text("Kapat", color = Color(0xFFB4BCCE))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showActionsSheet = false; vm.deselect() }) {
+                    Text("Seçimi Bırak", color = StudioV2Colors.Amber, fontWeight = FontWeight.SemiBold)
+                }
             }
+        )
+    }
+}
+
+@Composable
+private fun SelectActionTile(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    accent: Color = StudioV2Colors.Amber,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFF232734),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF333848)),
+        modifier = modifier
+            .height(44.dp)
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
+            Text(label, color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -1824,60 +1975,33 @@ internal fun LayerMaskPanel(
         )
         if (!hasMask) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Button(onClick = onAddRevealAll, shape = RoundedCornerShape(12.dp)) {
-                    Text("Beyaz Maske (Göster)", fontSize = 11.sp)
+                Button(onClick = onAddRevealAll, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                    Text("Beyaz (Göster)", fontSize = 11.sp, maxLines = 1)
                 }
-                OutlinedButton(onClick = onAddHideAll, shape = RoundedCornerShape(12.dp)) {
-                    Text("Siyah Maske (Gizle)", fontSize = 11.sp, color = Color.White)
+                OutlinedButton(onClick = onAddHideAll, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f)) {
+                    Text("Siyah (Gizle)", fontSize = 11.sp, color = Color.White, maxLines = 1)
                 }
-                if (hasSelection) {
-                    OutlinedButton(onClick = onAddFromSelection, shape = RoundedCornerShape(12.dp)) {
-                        Text("Seçimden Maske", fontSize = 11.sp, color = Color(0xFF4F9CFF))
-                    }
+            }
+            if (hasSelection) {
+                OutlinedButton(onClick = onAddFromSelection, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    Text("Mevcut Seçimden Maske Oluştur", fontSize = 11.sp, color = StudioV2Colors.Amber)
                 }
             }
         } else {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                ProPill(
-                    selected = maskPaintMode,
-                    onClick = onPaintHide,
-                    label = { Text("Siyah Boya (Gizle)", fontSize = 11.sp) }
-                )
-                ProPill(
-                    selected = false,
-                    onClick = onPaintReveal,
-                    label = { Text("Beyaz Boya (Göster)", fontSize = 11.sp) }
-                )
-                ProPill(
-                    selected = !maskEnabled,
-                    onClick = onToggleEnabled,
-                    label = { Text(if (maskEnabled) "Kapat" else "Aç", fontSize = 11.sp) }
-                )
-                ProPill(
-                    selected = false,
-                    onClick = onInvert,
-                    label = { Text("Ters Çevir", fontSize = 11.sp) }
-                )
-                ProPill(
-                    selected = false,
-                    onClick = onApplyMask,
-                    label = { Text("Uygula", fontSize = 11.sp) }
-                )
-                ProPill(
-                    selected = false,
-                    onClick = onDeleteMask,
-                    label = { Text("Maskeyi Sil", fontSize = 11.sp, color = Color(0xFFFF6B6B)) }
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SelectActionTile(Icons.Default.Brush, "Siyah (Gizle)", Modifier.weight(1f), accent = if (maskPaintMode) StudioV2Colors.Amber else Color.White, onClick = onPaintHide)
+                    SelectActionTile(Icons.Default.AutoFixNormal, "Beyaz (Göster)", Modifier.weight(1f), accent = Color.White, onClick = onPaintReveal)
+                    SelectActionTile(Icons.Default.Visibility, if (maskEnabled) "Kapat" else "Aç", Modifier.weight(1f), accent = if (!maskEnabled) StudioV2Colors.Amber else Color(0xFFB4BCCE), onClick = onToggleEnabled)
+                }
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    SelectActionTile(Icons.Default.InvertColors, "Ters Çevir", Modifier.weight(1f), onClick = onInvert)
+                    SelectActionTile(Icons.Default.Check, "Uygula", Modifier.weight(1f), onClick = onApplyMask)
+                    SelectActionTile(Icons.Default.Delete, "Maskeyi Sil", Modifier.weight(1f), accent = Color(0xFFFF6B6B), onClick = onDeleteMask)
+                }
             }
         }
     }

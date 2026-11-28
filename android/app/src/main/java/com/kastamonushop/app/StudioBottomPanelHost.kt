@@ -189,7 +189,10 @@ internal fun StudioBottomPanelHost(
                 BottomPanel.SELECT_MENU -> SelectMenuPanel(
                     vm = vm,
                     state = state,
-                    selectScrollState = selectScrollState,
+                    onOpenToolPicker = {
+                        s.showToolPopover = false
+                        s.activeWorkspaceV2 = StudioWorkspace.SELECT
+                    },
                     onOpenContentAwareFill = {
                         s.cafSampling = "auto"; s.cafColorAdaptation = "default"
                         s.cafRotationAdaptation = "none"; s.cafScale = false

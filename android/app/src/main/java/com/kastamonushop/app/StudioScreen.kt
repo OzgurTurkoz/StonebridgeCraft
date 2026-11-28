@@ -3002,7 +3002,7 @@ fun StonebridgeStudioScreen(
 
         // Studio v2.0 Frosted-Glass Workspace Sheet (opens cleanly above fixed 4+1 dock)
         val openWs = s.activeWorkspaceV2
-        if (openWs != null && (s.activePanel == BottomPanel.DOCK || s.activePanel == BottomPanel.DRAW_MENU || s.activePanel == BottomPanel.RETOUCH_MENU)) {
+        if (openWs != null && (s.activePanel == BottomPanel.DOCK || s.activePanel == BottomPanel.DRAW_MENU || s.activePanel == BottomPanel.RETOUCH_MENU || s.activePanel == BottomPanel.SELECT_MENU)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

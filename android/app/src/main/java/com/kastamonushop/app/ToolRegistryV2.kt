@@ -608,15 +608,51 @@ internal object ToolRegistryV2 {
             s.activePanel = BottomPanel.SELECT_MENU
         },
         StudioToolSpec(
-            id = "select_rect",
-            title = "Kare / Sihirli Değnek",
+            id = "select_brush",
+            title = "Seçim Fırçası",
             workspace = StudioWorkspace.SELECT,
             group = "Manuel Seçim",
-            icon = Icons.Default.SelectAll,
-            keywords = listOf("kare", "dikdörtgen", "sihirli değnek", "wand", "fırça seçim"),
+            icon = Icons.Default.AddCircleOutline,
+            keywords = listOf("fırça seçim", "ekle", "sil", "boyayarak seç"),
+            pipeline = EnginePipeline.LIVE_60FPS
+        ) {
+            vm.setTool(ActiveTool.SELECT_BRUSH_ADD)
+            s.activePanel = BottomPanel.SELECT_MENU
+        },
+        StudioToolSpec(
+            id = "select_wand",
+            title = "Sihirli Değnek",
+            workspace = StudioWorkspace.SELECT,
+            group = "Manuel Seçim",
+            icon = Icons.Default.AutoAwesome,
+            keywords = listOf("sihirli değnek", "wand", "benzer renk"),
+            pipeline = EnginePipeline.LIVE_60FPS
+        ) {
+            vm.setTool(ActiveTool.SELECT_WAND)
+            s.activePanel = BottomPanel.SELECT_MENU
+        },
+        StudioToolSpec(
+            id = "select_rect",
+            title = "Kutu / Elips",
+            workspace = StudioWorkspace.SELECT,
+            group = "Manuel Seçim",
+            icon = Icons.Default.CropSquare,
+            keywords = listOf("kare", "kutu", "dikdörtgen", "elips", "daire"),
             pipeline = EnginePipeline.LIVE_60FPS
         ) {
             vm.setTool(ActiveTool.SELECT_RECT)
+            s.activePanel = BottomPanel.SELECT_MENU
+        },
+        StudioToolSpec(
+            id = "select_subject",
+            title = "Konuyu Seç",
+            workspace = StudioWorkspace.SELECT,
+            group = "Akıllı Seçim",
+            icon = Icons.Default.PersonSearch,
+            keywords = listOf("konuyu seç", "subject", "nesne", "otomatik"),
+            pipeline = EnginePipeline.INSTANT_OP
+        ) {
+            vm.selectSubject()
             s.activePanel = BottomPanel.SELECT_MENU
         },
         StudioToolSpec(
