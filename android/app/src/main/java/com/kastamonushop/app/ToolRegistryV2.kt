@@ -749,7 +749,7 @@ internal object ToolRegistryV2 {
             pipeline = EnginePipeline.COALESCED_PROXY
         ) {
             vm.setTool(ActiveTool.NONE)
-            s.casScaleX = 100f; s.casScaleY = 100f; s.casAmount = 100f; s.casProtectSkinTones = true
+            s.casScaleX = 100f; s.casScaleY = 100f; s.casAmount = 100f; s.casProtectSkinTones = true; s.casBrushActive = false; s.casProtectStrokes = emptyList(); s.casActiveScreenStroke = emptyList()
             vm.beginProxyPreview()
             s.activePanel = BottomPanel.CONTENT_AWARE_SCALE_EDIT
         },

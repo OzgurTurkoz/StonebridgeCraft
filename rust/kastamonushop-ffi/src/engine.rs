@@ -248,6 +248,7 @@ struct ActiveLiveStroke {
     is_eraser: bool,
     is_pencil: bool,
     target_mask: bool,
+    size: f32,
 }
 
 struct LiveAdjustmentSession {
@@ -911,8 +912,16 @@ fn build_cinema_look_params(preset: &str, intensity: f32, vignette: f32, grain: 
 /// If `undo()`, `redo()`, or another action cleared `proxy_preview`, this rebuilds it
 /// seamlessly on the fly so active slider panels NEVER freeze or stop responding.
 fn ensure_proxy_preview_locked(guard: &mut EngineCore) -> Result<(), EngineError> {
-    if guard.proxy_preview.is_some() {
-        return Ok(());
+    ensure_proxy_preview_sized_locked(guard, 1024)
+}
+
+fn ensure_proxy_preview_sized_locked(guard: &mut EngineCore, max_proxy: u32) -> Result<(), EngineError> {
+    if let Some(ref p) = guard.proxy_preview {
+        let cur_max = p.base_doc.size.width.max(p.base_doc.size.height);
+        if cur_max <= max_proxy {
+            return Ok(());
+        }
+        guard.proxy_preview = None;
     }
     let (real_doc, active_id) = {
         let ds = guard.session.active().ok_or(EngineError::NoActiveDocument)?;
@@ -920,7 +929,6 @@ fn ensure_proxy_preview_locked(guard: &mut EngineCore) -> Result<(), EngineError
     };
     let real_w = real_doc.size.width.max(1);
     let real_h = real_doc.size.height.max(1);
-    let max_proxy = 1024u32;
     let scale = (max_proxy as f32 / real_w.max(real_h) as f32).min(1.0);
     let pw = ((real_w as f32 * scale).round() as u32).clamp(1, max_proxy);
     let ph = ((real_h as f32 * scale).round() as u32).clamp(1, max_proxy);
@@ -6099,7 +6107,7 @@ impl KastamonuEngine {
         let mut guard = self.core.lock();
         let active_id = guard.session.active().and_then(|ds| ds.active_layer());
         guard.dismiss_compare();
-        ensure_proxy_preview_locked(&mut guard)?;
+        ensure_proxy_preview_sized_locked(&mut guard, 512)?;
         let Some(proxy) = guard.proxy_preview.as_mut() else {
             return Ok(());
         };
@@ -6445,6 +6453,7 @@ impl KastamonuEngine {
             is_eraser,
             is_pencil: false,
             target_mask,
+            size: size.clamp(1.0, 400.0),
         });
         guard.mark_region_dirty(dmg);
         Ok(())
@@ -6458,12 +6467,28 @@ impl KastamonuEngine {
         let Some(active) = guard.live_stroke.as_mut() else {
             return Ok(());
         };
-        let pts: Vec<StrokePoint> = samples.iter().map(sample_to_stroke_point).collect();
+        // v2.4.2 Performance: thin dense sub-pixel touch points for large brushes (250px+)
+        let min_step = (active.size * 0.10).clamp(2.0, 20.0);
+        let min_step2 = min_step * min_step;
+        let mut thinned: Vec<&StrokeSample> = Vec::with_capacity(samples.len());
+        let mut last_xy: Option<(f32, f32)> = active.points_json.last().and_then(|v| {
+            Some((v.get(0)?.as_f64()? as f32, v.get(1)?.as_f64()? as f32))
+        });
+        for (idx, s) in samples.iter().enumerate() {
+            let is_last = idx + 1 == samples.len();
+            if is_last || last_xy.map_or(true, |(lx, ly)| {
+                let dx = s.x - lx; let dy = s.y - ly; dx * dx + dy * dy >= min_step2
+            }) {
+                thinned.push(s);
+                last_xy = Some((s.x, s.y));
+            }
+        }
+        let pts: Vec<StrokePoint> = thinned.iter().map(|s| sample_to_stroke_point(s)).collect();
         let dmg = active
             .live
             .push(&pts)
             .map_err(|e| EngineError::CommandFailed { detail: e.to_string() })?;
-        for s in &samples {
+        for s in thinned {
             active.points_json.push(sample_to_json(s));
         }
         guard.mark_region_dirty(dmg);
@@ -8790,6 +8815,7 @@ impl KastamonuEngine {
             is_eraser: false,
             is_pencil: true,
             target_mask: false,
+            size: size.clamp(1.0, 400.0),
         });
         guard.mark_region_dirty(dmg);
         Ok(())
@@ -9660,7 +9686,7 @@ impl KastamonuEngine {
         let mut guard = self.core.lock();
         let active_id = guard.session.active().and_then(|ds| ds.active_layer());
         guard.dismiss_compare();
-        ensure_proxy_preview_locked(&mut guard)?;
+        ensure_proxy_preview_sized_locked(&mut guard, 480)?;
         let Some(proxy) = guard.proxy_preview.as_mut() else {
             return Ok(());
         };

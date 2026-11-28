@@ -1978,13 +1978,13 @@ fun StonebridgeStudioScreen(
                         Row(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(14.dp))
-                                .clickable { vm.clearSelection() }
+                                .clickable { vm.deselect() }
                                 .padding(horizontal = 6.dp, vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = "Seçimi Kaldır", tint = Color(0xFFFF8A8A), modifier = Modifier.size(14.dp))
-                            Text("Seçimi Kaldır", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Icon(Icons.Default.Close, contentDescription = "Seçimi Bırak", tint = Color(0xFFFF8A8A), modifier = Modifier.size(14.dp))
+                            Text("Seçimi Bırak", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                         }
                         Box(Modifier.width(1.dp).height(14.dp).background(Color(0x33FFFFFF)))
                         Text(
@@ -3015,6 +3015,7 @@ fun StonebridgeStudioScreen(
             StudioWorkspaceSheetV2(
                 workspace = openWs,
                 pinnedIds = s.pinnedToolIdsV2,
+                gridState = s.workspaceGridStates[openWs] ?: androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
                 onTogglePin = { id ->
                     s.pinnedToolIdsV2 = if (id in s.pinnedToolIdsV2) s.pinnedToolIdsV2 - id else s.pinnedToolIdsV2 + id
                 },

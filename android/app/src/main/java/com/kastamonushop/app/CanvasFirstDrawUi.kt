@@ -301,109 +301,120 @@ internal fun CompactDrawBottomBar(
     popoverOpen: Boolean,
     onTogglePopover: () -> Unit,
     onOpenColorWheel: () -> Unit,
+    onOpenToolPicker: () -> Unit,
     onClose: () -> Unit
 ) {
     val activeColor = remember(state.colorHex) {
         runCatching { Color(AndroidColor.parseColor(state.colorHex)) }.getOrDefault(Color.White)
     }
+    var lastPaintTool by remember { mutableStateOf(ActiveTool.BRUSH) }
+    val isEraser = state.activeTool == ActiveTool.ERASER || state.activeTool == ActiveTool.MAGIC_ERASER || state.activeTool == ActiveTool.BG_ERASER
+    LaunchedEffect(state.activeTool) {
+        if (!isEraser && state.activeTool != ActiveTool.NONE) {
+            lastPaintTool = state.activeTool
+        }
+    }
+    val (toolIcon, toolLabel) = when (state.activeTool) {
+        ActiveTool.PENCIL -> Icons.Default.Edit to "Kalem"
+        ActiveTool.ERASER -> Icons.Default.AutoFixNormal to "Silgi"
+        ActiveTool.MAGIC_ERASER -> Icons.Default.AutoFixHigh to "Sihirli Silgi"
+        ActiveTool.BG_ERASER -> Icons.Default.CleaningServices to "Arka Silgi"
+        ActiveTool.ADJUST_BRUSH -> Icons.Default.Tune to "Ayar Fırçası"
+        ActiveTool.BUCKET -> Icons.Default.FormatColorFill to "Boya Kovası"
+        ActiveTool.EYEDROPPER -> Icons.Default.Colorize to "Damlalık"
+        ActiveTool.MIXER_BRUSH -> Icons.Default.WaterDrop to "Karıştır"
+        ActiveTool.COLOR_REPLACE -> Icons.Default.InvertColors to "Renk Değiş"
+        else -> Icons.Default.Brush to "Fırça"
+    }
+
+    // Pro ibisPaint X + Procreate Pocket Fixed 5-Slot Draw Bar (zero horizontal scroll, zero cut-off text)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier.size(36.dp)
-        ) {
+        IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri", tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
-        Row(
+        // 1-Tap Brush <-> Eraser quick toggle (ibisPaint X ergonomics)
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = if (isEraser) StudioV2Colors.AmberSoft else Color(0xFF1F222C),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (isEraser) StudioV2Colors.Amber else Color(0xFF333848)),
             modifier = Modifier
-                .weight(1f)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .height(36.dp)
+                .clickable {
+                    if (isEraser) vm.setTool(lastPaintTool) else vm.setTool(ActiveTool.ERASER)
+                }
         ) {
-            SlimToolChip(Icons.Default.Brush, "Fırça", state.activeTool == ActiveTool.BRUSH) {
-                vm.setTool(ActiveTool.BRUSH)
-            }
-            SlimToolChip(Icons.Default.Edit, "Kalem", state.activeTool == ActiveTool.PENCIL) {
-                vm.setTool(ActiveTool.PENCIL)
-            }
-            SlimToolChip(Icons.Default.AutoFixNormal, "Silgi", state.activeTool == ActiveTool.ERASER) {
-                vm.setTool(ActiveTool.ERASER)
-            }
-            SlimToolChip(Icons.Default.AutoFixHigh, "Sih. Silgi", state.activeTool == ActiveTool.MAGIC_ERASER) {
-                vm.setTool(ActiveTool.MAGIC_ERASER)
-            }
-            SlimToolChip(Icons.Default.CleaningServices, "Arka Silgi", state.activeTool == ActiveTool.BG_ERASER) {
-                vm.setTool(ActiveTool.BG_ERASER)
-            }
-            SlimToolChip(Icons.Default.Tune, "Ayar Fırç.", state.activeTool == ActiveTool.ADJUST_BRUSH) {
-                vm.setTool(ActiveTool.ADJUST_BRUSH)
-            }
-            SlimToolChip(Icons.Default.WaterDrop, "Karıştır", state.activeTool == ActiveTool.MIXER_BRUSH) {
-                vm.setTool(ActiveTool.MIXER_BRUSH)
-            }
-            SlimToolChip(Icons.Default.InvertColors, "Renk Değ.", state.activeTool == ActiveTool.COLOR_REPLACE) {
-                vm.setTool(ActiveTool.COLOR_REPLACE)
-            }
-            SlimToolChip(Icons.Default.FormatColorFill, "Kova", state.activeTool == ActiveTool.BUCKET) {
-                vm.setTool(ActiveTool.BUCKET)
-            }
-            SlimToolChip(Icons.Default.Colorize, "Damlalık", state.activeTool == ActiveTool.EYEDROPPER) {
-                vm.setTool(if (state.activeTool == ActiveTool.EYEDROPPER) ActiveTool.BRUSH else ActiveTool.EYEDROPPER)
-            }
-            SlimToolChip(Icons.Default.Flip, if (state.symmetryMode == "off") "Simetri" else "Simetri ✓", state.symmetryMode != "off") {
-                val order = listOf("off", "vertical", "horizontal", "dual", "diagonal")
-                val next = order[(order.indexOf(state.symmetryMode) + 1) % order.size]
-                vm.setSymmetryMode(next)
-            }
-            SlimToolChip(Icons.Default.Straighten, "Cetvel", state.rulerEnabled) {
-                vm.toggleRuler()
-            }
-            SlimToolChip(
-                Icons.Default.Flip,
-                when (state.symmetryMode) {
-                    "vertical" -> "Ayna V"
-                    "horizontal" -> "Ayna H"
-                    "dual" -> "Ayna 4x"
-                    else -> "Ayna"
-                },
-                state.symmetryMode != "off"
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
-                vm.cycleSymmetry()
+                Icon(
+                    if (isEraser) Icons.Default.Brush else Icons.Default.AutoFixNormal,
+                    contentDescription = "Fırça/Silgi Değiştir",
+                    tint = if (isEraser) StudioV2Colors.Amber else Color(0xFFD5D9E4),
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    if (isEraser) "Fırça" else "Silgi",
+                    color = Color.White,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
             }
         }
 
-        // Direct 1-tap Pro HSV Color Wheel swatch
+        // Center Active Tool Capsule — opens clean Çiz & Rötuş grid
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Color(0xFF232734),
+            border = androidx.compose.foundation.BorderStroke(1.dp, StudioV2Colors.Amber.copy(alpha = 0.65f)),
+            modifier = Modifier
+                .weight(1f)
+                .height(36.dp)
+                .clickable { onOpenToolPicker() }
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(toolIcon, contentDescription = null, tint = StudioV2Colors.Amber, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(toolLabel, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(3.dp))
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(16.dp))
+            }
+        }
+
+        // Color Well
         Box(
             modifier = Modifier
                 .size(34.dp)
                 .clip(CircleShape)
                 .background(activeColor)
-                .border(2.5.dp, Color.White, CircleShape)
+                .border(2.dp, Color.White, CircleShape)
                 .clickable { onOpenColorWheel() }
         )
 
-        // Popover toggle button (Brushes / Dynamics / Tool Options)
+        // Tool Settings Popover Trigger
         Surface(
             shape = CircleShape,
-            color = if (popoverOpen) StudioV2Colors.AmberSoft else Color(0x18FFFFFF),
+            color = if (popoverOpen) StudioV2Colors.AmberSoft else Color(0xFF1F222C),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (popoverOpen) StudioV2Colors.Amber else Color(0xFF333848)),
             modifier = Modifier
                 .size(36.dp)
                 .clickable { onTogglePopover() }
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = "Fırça & Ayarlar",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.Tune, contentDescription = "Ayarlar", tint = if (popoverOpen) StudioV2Colors.Amber else Color.White, modifier = Modifier.size(18.dp))
             }
         }
     }
@@ -415,90 +426,112 @@ internal fun CompactRetouchBottomBar(
     state: EditorUiState,
     popoverOpen: Boolean,
     onTogglePopover: () -> Unit,
+    onOpenToolPicker: () -> Unit,
     onClose: () -> Unit
 ) {
+    val (toolIcon, toolLabel) = when (state.activeTool) {
+        ActiveTool.REMOVE_TOOL -> Icons.Default.AutoFixHigh to "Akıllı Kaldır"
+        ActiveTool.SPOT_HEAL -> Icons.Default.Healing to "Nokta & Rötuş"
+        ActiveTool.PATCH -> Icons.Default.Texture to "Yama Aracı"
+        ActiveTool.RED_EYE -> Icons.Default.RemoveRedEye to "Kırmızı Göz"
+        ActiveTool.SMUDGE -> Icons.Default.Gesture to "Dağıt (Smudge)"
+        ActiveTool.DODGE -> Icons.Default.WbSunny to "Aydınlat"
+        ActiveTool.BURN -> Icons.Default.NightsStay to "Koyulaştır"
+        ActiveTool.SPONGE_SAT -> Icons.Default.Tonality to "Sünger (+)"
+        ActiveTool.SPONGE_DESAT -> Icons.Default.FilterBAndW to "Sünger (-)"
+        ActiveTool.BLUR_BRUSH -> Icons.Default.BlurOn to "Bulanık Fırça"
+        ActiveTool.SHARPEN_BRUSH -> Icons.Default.Details to "Keskin Fırça"
+        ActiveTool.HEALING_BRUSH -> Icons.Default.HealthAndSafety to "Onarım Fırçası"
+        ActiveTool.HISTORY_BRUSH -> Icons.Default.History to "Geçmiş Fırçası"
+        ActiveTool.ART_HISTORY_BRUSH -> Icons.Default.ColorLens to "Sanat Geçmişi"
+        else -> Icons.Default.ContentCopy to "Klon Damgası"
+    }
+
+    // Pro Fixed 4-Slot Retouch Bar (zero horizontal scroll, zero cut-off text)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .padding(horizontal = 10.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        IconButton(
-            onClick = onClose,
-            modifier = Modifier.size(36.dp)
-        ) {
+        IconButton(onClick = onClose, modifier = Modifier.size(36.dp)) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri", tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
-        Row(
+        // Center Active Retouch Tool Capsule — opens clean Çiz & Rötuş grid
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = Color(0xFF232734),
+            border = androidx.compose.foundation.BorderStroke(1.dp, StudioV2Colors.Amber.copy(alpha = 0.65f)),
             modifier = Modifier
                 .weight(1f)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .height(36.dp)
+                .clickable { onOpenToolPicker() }
         ) {
-            SlimToolChip(Icons.Default.AutoFixHigh, "Kaldır", state.activeTool == ActiveTool.REMOVE_TOOL) {
-                vm.setTool(ActiveTool.REMOVE_TOOL)
-            }
-            SlimToolChip(Icons.Default.Healing, "Leke", state.activeTool == ActiveTool.SPOT_HEAL) {
-                vm.setTool(ActiveTool.SPOT_HEAL)
-            }
-            SlimToolChip(Icons.Default.Texture, "Yama", state.activeTool == ActiveTool.PATCH) {
-                vm.setTool(ActiveTool.PATCH)
-            }
-            SlimToolChip(Icons.Default.RemoveRedEye, "Kır. Göz", state.activeTool == ActiveTool.RED_EYE) {
-                vm.setTool(ActiveTool.RED_EYE)
-            }
-            SlimToolChip(Icons.Default.Gesture, "Dağıt", state.activeTool == ActiveTool.SMUDGE) {
-                vm.setTool(ActiveTool.SMUDGE)
-            }
-            SlimToolChip(Icons.Default.WbSunny, "Aydınlat", state.activeTool == ActiveTool.DODGE) {
-                vm.setTool(ActiveTool.DODGE)
-            }
-            SlimToolChip(Icons.Default.NightsStay, "Koyulaştır", state.activeTool == ActiveTool.BURN) {
-                vm.setTool(ActiveTool.BURN)
-            }
-            SlimToolChip(Icons.Default.Tonality, "Sünger+", state.activeTool == ActiveTool.SPONGE_SAT) {
-                vm.setTool(ActiveTool.SPONGE_SAT)
-            }
-            SlimToolChip(Icons.Default.FilterBAndW, "Sünger-", state.activeTool == ActiveTool.SPONGE_DESAT) {
-                vm.setTool(ActiveTool.SPONGE_DESAT)
-            }
-            SlimToolChip(Icons.Default.BlurOn, "Bulanık", state.activeTool == ActiveTool.BLUR_BRUSH) {
-                vm.setTool(ActiveTool.BLUR_BRUSH)
-            }
-            SlimToolChip(Icons.Default.Details, "Keskin", state.activeTool == ActiveTool.SHARPEN_BRUSH) {
-                vm.setTool(ActiveTool.SHARPEN_BRUSH)
-            }
-            SlimToolChip(Icons.Default.HealthAndSafety, "Düzelt", state.activeTool == ActiveTool.HEALING_BRUSH) {
-                vm.setTool(ActiveTool.HEALING_BRUSH)
-            }
-            SlimToolChip(Icons.Default.History, "Geçmiş", state.activeTool == ActiveTool.HISTORY_BRUSH) {
-                vm.setTool(ActiveTool.HISTORY_BRUSH)
-            }
-            SlimToolChip(Icons.Default.ColorLens, "Sanat Geç.", state.activeTool == ActiveTool.ART_HISTORY_BRUSH) {
-                vm.setTool(ActiveTool.ART_HISTORY_BRUSH)
-            }
-            SlimToolChip(Icons.Default.ContentCopy, "Klonla", state.activeTool == ActiveTool.CLONE_STAMP) {
-                vm.setTool(ActiveTool.CLONE_STAMP)
+            Row(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(toolIcon, contentDescription = null, tint = StudioV2Colors.Amber, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(toolLabel, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.width(3.dp))
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = null, tint = Color(0xFF9CA3AF), modifier = Modifier.size(16.dp))
             }
         }
 
+        when (state.activeTool) {
+            ActiveTool.CLONE_STAMP, ActiveTool.HEALING_BRUSH -> {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (state.pickingCloneSource) StudioV2Colors.AmberSoft else Color(0xFF1F222C),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (state.pickingCloneSource) StudioV2Colors.Amber else Color(0xFF333848)),
+                    modifier = Modifier
+                        .height(36.dp)
+                        .clickable {
+                            if (state.activeTool == ActiveTool.CLONE_STAMP) vm.requestPickCloneSource() else vm.startPickHealingSource()
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Default.MyLocation, contentDescription = "Kaynak", tint = StudioV2Colors.Amber, modifier = Modifier.size(14.dp))
+                        Text("Kaynak", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+            ActiveTool.PATCH -> {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFF1F222C),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF333848)),
+                    modifier = Modifier
+                        .height(36.dp)
+                        .clickable { vm.updatePatchMode(if (state.patchMode == "source") "destination" else "source") }
+                ) {
+                    Box(modifier = Modifier.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                        Text(if (state.patchMode == "source") "Kaynak" else "Hedef", color = StudioV2Colors.Amber, fontSize = 11.5.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+            else -> Unit
+        }
+
+        // Tool Settings Popover Trigger
         Surface(
             shape = CircleShape,
-            color = if (popoverOpen) StudioV2Colors.AmberSoft else Color(0x18FFFFFF),
+            color = if (popoverOpen) StudioV2Colors.AmberSoft else Color(0xFF1F222C),
+            border = androidx.compose.foundation.BorderStroke(1.dp, if (popoverOpen) StudioV2Colors.Amber else Color(0xFF333848)),
             modifier = Modifier
                 .size(36.dp)
                 .clickable { onTogglePopover() }
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = "Rötuş Ayarları",
-                    tint = Color.White,
-                    modifier = Modifier.size(18.dp)
-                )
+                Icon(Icons.Default.Tune, contentDescription = "Ayarlar", tint = if (popoverOpen) StudioV2Colors.Amber else Color.White, modifier = Modifier.size(18.dp))
             }
         }
     }

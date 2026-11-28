@@ -157,9 +157,15 @@ internal fun StudioBottomPanelHost(
                         s.showToolPopover = false
                         s.showQuickColorWheel = true
                     },
+                    onOpenToolPicker = {
+                        s.showToolPopover = false
+                        s.activeWorkspaceV2 = StudioWorkspace.DRAW
+                    },
                     onClose = {
                         s.showToolPopover = false
+                        vm.setTool(ActiveTool.NONE)
                         s.activePanel = BottomPanel.DOCK
+                        s.activeWorkspaceV2 = s.lastWorkspaceV2 ?: StudioWorkspace.DRAW
                     }
                 )
 
@@ -168,9 +174,15 @@ internal fun StudioBottomPanelHost(
                     state = state,
                     popoverOpen = s.showToolPopover,
                     onTogglePopover = { s.showToolPopover = !s.showToolPopover },
+                    onOpenToolPicker = {
+                        s.showToolPopover = false
+                        s.activeWorkspaceV2 = StudioWorkspace.DRAW
+                    },
                     onClose = {
                         s.showToolPopover = false
+                        vm.setTool(ActiveTool.NONE)
                         s.activePanel = BottomPanel.DOCK
+                        s.activeWorkspaceV2 = s.lastWorkspaceV2 ?: StudioWorkspace.DRAW
                     }
                 )
 
@@ -218,7 +230,7 @@ internal fun StudioBottomPanelHost(
                         vm.updateProxyModifySelection(s.selModifyOp, s.selModifyRadius)
                         s.activePanel = BottomPanel.SELECT_MODIFY_EDIT
                     },
-                    onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK }
+                    onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 }
                 )
 
                 BottomPanel.TEXT_EDIT -> {
@@ -455,7 +467,7 @@ internal fun StudioBottomPanelHost(
                                 s.gradStyle, s.gradStartHex, s.gradEndHex, s.gradOpacity
                             )
                         },
-                        onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK },
+                        onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                         onApply = {
                             vm.applyGradientFill(
                                 docW * s.gradFromNormX, docH * s.gradFromNormY,
@@ -485,7 +497,7 @@ internal fun StudioBottomPanelHost(
                                 s.shapeFillHex, s.shapeStrokeHex, s.shapeStrokeWidth, s.shapeCornerRadius, s.shapeSides
                             )
                         },
-                        onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK },
+                        onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                         onApply = {
                             vm.createShapeLayer(
                                 s.shapeKind,
@@ -983,7 +995,7 @@ internal fun StudioBottomPanelHost(
                 }
 
                 BottomPanel.FILTER_MENU -> FilterMenuPanel(
-                    onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK },
+                    onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onBlur = { s.blurRadiusVal = 0f; vm.beginProxyPreview(); s.activePanel = BottomPanel.BLUR_EDIT },
                     onSharpen = { s.sharpenAmountVal = 0f; vm.beginProxyPreview(); s.activePanel = BottomPanel.SHARPEN_EDIT },
                     onMotion = {
@@ -1034,9 +1046,9 @@ internal fun StudioBottomPanelHost(
                     }
                 )
                 BottomPanel.QUICK_ACTIONS_MENU -> QuickActionsPanel(
-                    onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK },
-                    onRemoveBg = { vm.smartRemoveBackground(); s.activePanel = BottomPanel.DOCK },
-                    onPortraitBlur = { vm.smartPortraitBlur(18f); s.activePanel = BottomPanel.DOCK },
+                    onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
+                    onRemoveBg = { vm.smartRemoveBackground(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
+                    onPortraitBlur = { vm.smartPortraitBlur(18f); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onObjectRemove = {
                         vm.setTool(ActiveTool.REMOVE_TOOL)
                         s.activePanel = BottomPanel.RETOUCH_MENU
@@ -1122,7 +1134,7 @@ internal fun StudioBottomPanelHost(
                 )
                 BottomPanel.AUTO_ENHANCE_MENU -> AutoEnhancePanel(
                     onClose = { s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onPick = { mode, lbl -> vm.applyAutoEnhance(mode, lbl); s.activePanel = BottomPanel.DOCK }
+                    onPick = { mode, lbl -> vm.applyAutoEnhance(mode, lbl); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 }
                 )
                 BottomPanel.CINEMA_LOOK_EDIT -> CinemaLookPanel(
                     thumbs = cinemaThumbs,
@@ -1668,9 +1680,9 @@ internal fun StudioBottomPanelHost(
                             if (activeL != null) vm.toggleLayerMaskEnabled(activeL.id, !activeL.maskEnabled)
                         },
                         onInvert = { vm.invertActiveLayerMask() },
-                        onApplyMask = { vm.applyActiveLayerMask(); s.activePanel = BottomPanel.DOCK },
+                        onApplyMask = { vm.applyActiveLayerMask(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                         onDeleteMask = { vm.deleteActiveLayerMask() },
-                        onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK }
+                        onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 }
                     )
                 }
                 BottomPanel.BLEND_IF_EDIT -> {
@@ -1696,7 +1708,7 @@ internal fun StudioBottomPanelHost(
                             s.blendIfUnderBlack = 0f; s.blendIfUnderWhite = 255f; s.blendIfFeather = 20f
                             vm.resetBlendIf()
                         },
-                        onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK },
+                        onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                         onApply = {
                             vm.applyBlendIf(
                                 s.blendIfThisBlack.roundToInt(),

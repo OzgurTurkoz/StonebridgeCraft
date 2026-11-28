@@ -641,6 +641,9 @@ internal class StudioSessionState {
     // v2.0.0 Studio v2.0 state (fixed 4+1 dock, frosted workspace sheet, command palette)
     var activeWorkspaceV2 by mutableStateOf<StudioWorkspace?>(null)
     var lastWorkspaceV2 by mutableStateOf<StudioWorkspace?>(null)
+    val workspaceGridStates: Map<StudioWorkspace, androidx.compose.foundation.lazy.grid.LazyGridState> =
+        StudioWorkspace.entries.associateWith { androidx.compose.foundation.lazy.grid.LazyGridState() }
+    var lastDrawNonEraserTool by mutableStateOf(ActiveTool.BRUSH)
     var showSearchPaletteV2 by mutableStateOf(false)
     var pinnedToolIdsV2 by mutableStateOf<Set<String>>(ToolRegistryV2.defaultPinnedIds)
 }

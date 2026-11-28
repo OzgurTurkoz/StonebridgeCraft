@@ -146,6 +146,7 @@ internal fun StudioFixedDockV2(
 internal fun StudioWorkspaceSheetV2(
     workspace: StudioWorkspace,
     pinnedIds: Set<String>,
+    gridState: androidx.compose.foundation.lazy.grid.LazyGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
     onTogglePin: (String) -> Unit,
     onSelectTool: (StudioToolSpec) -> Unit,
     onDismiss: () -> Unit,
@@ -270,6 +271,7 @@ internal fun StudioWorkspaceSheetV2(
                 }
             } else {
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Fixed(3),
                     contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

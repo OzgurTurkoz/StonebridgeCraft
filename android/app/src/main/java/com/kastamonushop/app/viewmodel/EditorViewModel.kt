@@ -326,6 +326,22 @@ class EditorViewModel : ViewModel() {
             val amount: Float,
             val protectSkinTones: Boolean
         ) : ProxyJob()
+        data class ContentAwareScalePro(
+            val scaleX: Float,
+            val scaleY: Float,
+            val amount: Float,
+            val protectSkinTones: Boolean,
+            val protectStrokes: List<CafSamplingStrokeInput>
+        ) : ProxyJob()
+        data class ContentAwareFillPro(
+            val sampling: String,
+            val colorAdaptation: String,
+            val rotationAdaptation: String,
+            val scale: Boolean,
+            val mirror: Boolean,
+            val sampleAllLayers: Boolean,
+            val strokes: List<CafSamplingStrokeInput>
+        ) : ProxyJob()
         data class SelectSky(val threshold: Float, val softness: Float, val mode: String, val sampleAllLayers: Boolean) : ProxyJob()
         data class ColorRange(val preset: String, val colorHex: String, val fuzziness: Float, val invert: Boolean, val mode: String, val sampleAllLayers: Boolean) : ProxyJob()
         data class FocusArea(val rangePct: Float, val noisePct: Float, val mode: String, val sampleAllLayers: Boolean) : ProxyJob()
@@ -1554,6 +1570,13 @@ class EditorViewModel : ViewModel() {
                     )
                     is ProxyJob.ContentAwareScale -> engine.updateProxyContentAwareScale(
                         job.scaleX, job.scaleY, job.amount, job.protectSkinTones
+                    )
+                    is ProxyJob.ContentAwareScalePro -> engine.updateProxyContentAwareScalePro(
+                        job.scaleX, job.scaleY, job.amount, job.protectSkinTones, job.protectStrokes
+                    )
+                    is ProxyJob.ContentAwareFillPro -> engine.updateProxyContentAwareFillPro(
+                        job.sampling, job.colorAdaptation, job.rotationAdaptation,
+                        job.scale, job.mirror, job.sampleAllLayers, job.strokes
                     )
                     is ProxyJob.SelectSky -> engine.updateProxySelectSky(
                         job.threshold, job.softness, job.mode, job.sampleAllLayers
@@ -4587,12 +4610,7 @@ class EditorViewModel : ViewModel() {
         scale: Boolean, mirror: Boolean, sampleAllLayers: Boolean,
         strokes: List<CafSamplingStrokeInput>
     ) {
-        paintExecutor.execute {
-            runCatching {
-                engine.updateProxyContentAwareFillPro(sampling, colorAdaptation, rotationAdaptation, scale, mirror, sampleAllLayers, strokes)
-                NativeSurfaceBridge.nativeRenderFrame()
-            }
-        }
+        enqueueProxyJob(ProxyJob.ContentAwareFillPro(sampling, colorAdaptation, rotationAdaptation, scale, mirror, sampleAllLayers, strokes))
     }
 
     fun applyContentAwareFillPro(
@@ -4619,12 +4637,7 @@ class EditorViewModel : ViewModel() {
         scaleX: Float, scaleY: Float, amount: Float, protectSkinTones: Boolean,
         protectStrokes: List<CafSamplingStrokeInput>
     ) {
-        paintExecutor.execute {
-            runCatching {
-                engine.updateProxyContentAwareScalePro(scaleX, scaleY, amount, protectSkinTones, protectStrokes)
-                NativeSurfaceBridge.nativeRenderFrame()
-            }
-        }
+        enqueueProxyJob(ProxyJob.ContentAwareScalePro(scaleX, scaleY, amount, protectSkinTones, protectStrokes))
     }
 
     fun applyContentAwareScalePro(
