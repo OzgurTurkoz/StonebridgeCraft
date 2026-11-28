@@ -318,6 +318,7 @@ internal fun StudioBottomPanelHost(
                                 extras = extras
                             )
                             s.activePanel = BottomPanel.DOCK
+                            s.activeWorkspaceV2 = s.lastWorkspaceV2
                         }
                     )
                 }
@@ -435,7 +436,8 @@ internal fun StudioBottomPanelHost(
                     onClose = { onClearAdjustGpuPreviewOnly(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = {
                         vm.applyCameraRawJson(buildCameraRawProJson(s))
-                        s.activePanel = BottomPanel.DOCK
+                        resetCameraRawProState(s)
+                        vm.beginProxyPreview()
                     }
                 )
                 BottomPanel.GRADIENT_EDIT -> {
@@ -461,6 +463,7 @@ internal fun StudioBottomPanelHost(
                                 s.gradStyle, s.gradStartHex, s.gradEndHex, s.gradOpacity
                             )
                             s.activePanel = BottomPanel.DOCK
+                            s.activeWorkspaceV2 = s.lastWorkspaceV2
                         }
                     )
                 }
@@ -491,6 +494,7 @@ internal fun StudioBottomPanelHost(
                                 s.shapeFillHex, s.shapeStrokeHex, s.shapeStrokeWidth, s.shapeCornerRadius, s.shapeSides
                             )
                             s.activePanel = BottomPanel.DOCK
+                            s.activeWorkspaceV2 = s.lastWorkspaceV2
                         }
                     )
                 }
@@ -507,9 +511,10 @@ internal fun StudioBottomPanelHost(
                     },
                     onClose = { onClearAdjustGpuPreviewOnly(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = {
-                        if (s.brightnessVal.roundToInt() == 0 && s.contrastVal.roundToInt() == 0) onClearAdjustGpuPreviewOnly()
-                        else vm.applyAdjustmentOnce("brightnessContrast", """{"brightness":${s.brightnessVal.roundToInt()},"contrast":${s.contrastVal.roundToInt()}}""", "Işık & Kontrast")
-                        s.activePanel = BottomPanel.DOCK
+                        if (s.brightnessVal.roundToInt() != 0 || s.contrastVal.roundToInt() != 0) {
+                            vm.applyAdjustmentOnce("brightnessContrast", """{"brightness":${s.brightnessVal.roundToInt()},"contrast":${s.contrastVal.roundToInt()}}""", "Işık & Kontrast")
+                            s.brightnessVal = 0f; s.contrastVal = 0f
+                        }
                     }
                 )
 
@@ -526,9 +531,10 @@ internal fun StudioBottomPanelHost(
                     },
                     onClose = { onClearAdjustGpuPreviewOnly(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = {
-                        if (s.saturationVal.roundToInt() == 0 && s.hueVal.roundToInt() == 0) onClearAdjustGpuPreviewOnly()
-                        else vm.applyAdjustmentOnce("hueSaturation", """{"hue":${s.hueVal.roundToInt()},"saturation":${s.saturationVal.roundToInt()},"lightness":0}""", "Renk & Canlılık")
-                        s.activePanel = BottomPanel.DOCK
+                        if (s.saturationVal.roundToInt() != 0 || s.hueVal.roundToInt() != 0) {
+                            vm.applyAdjustmentOnce("hueSaturation", """{"hue":${s.hueVal.roundToInt()},"saturation":${s.saturationVal.roundToInt()},"lightness":0}""", "Renk & Canlılık")
+                            s.saturationVal = 0f; s.hueVal = 0f
+                        }
                     }
                 )
 
@@ -563,9 +569,10 @@ internal fun StudioBottomPanelHost(
                         s.activeWorkspaceV2 = s.lastWorkspaceV2
                     },
                     onApply = {
-                        vm.clearHistogram()
                         vm.applyAdjustmentOnce("levels", s.buildLevelsProJson(), "Seviyeler")
-                        s.activePanel = BottomPanel.DOCK
+                        s.resetLevelsPro()
+                        vm.beginProxyPreview()
+                        vm.refreshHistogram(force = true)
                     }
                 )
 
@@ -591,7 +598,8 @@ internal fun StudioBottomPanelHost(
                             },
                             onApply = {
                                 vm.applyAdjustmentOnce("colorBalance", buildCbJson(), "Renk dengesi")
-                                s.activePanel = BottomPanel.DOCK
+                                s.resetColorBalancePro()
+                                vm.beginProxyPreview()
                             }
                         )
                         Row(
@@ -663,12 +671,14 @@ internal fun StudioBottomPanelHost(
                                 s.activeWorkspaceV2 = s.lastWorkspaceV2
                             },
                             onApply = {
-                                s.curveOverlayExpanded = false
                                 s.curveEyedropperMode = 0
-                                vm.clearHistogram()
-                                onClearAdjustGpuPreviewOnly()
                                 vm.applyAdjustmentOnce("curves", s.buildCurvesProJson(), "Eğriler")
-                                s.activePanel = BottomPanel.DOCK
+                                s.resetAllCurves()
+                                s.curveUndoStack = emptyList()
+                                s.curveRedoStack = emptyList()
+                                s.curveOverlayExpanded = true
+                                vm.beginProxyPreview()
+                                vm.refreshHistogram(force = true)
                             }
                         )
                         Row(
@@ -894,6 +904,7 @@ internal fun StudioBottomPanelHost(
                             onApply = {
                                 vm.cropCanvas(cropX, cropY, cropW, cropH)
                                 s.activePanel = BottomPanel.DOCK
+                                s.activeWorkspaceV2 = s.lastWorkspaceV2
                             }
                         )
                         Row(
@@ -946,6 +957,7 @@ internal fun StudioBottomPanelHost(
                                     s.pBl.x * docW, s.pBl.y * docH
                                 )
                                 s.activePanel = BottomPanel.DOCK
+                                s.activeWorkspaceV2 = s.lastWorkspaceV2
                             }
                         )
                         Row(
@@ -1000,14 +1012,26 @@ internal fun StudioBottomPanelHost(
                     radius = s.blurRadiusVal,
                     onRadius = { s.blurRadiusVal = it; vm.updateProxyBlur(it) },
                     onClose = { onClearAdjustGpuPreviewOnly(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applyBlurFast(s.blurRadiusVal); s.activePanel = BottomPanel.DOCK }
+                    onApply = {
+                        if (s.blurRadiusVal > 0.2f) {
+                            vm.applyBlurFast(s.blurRadiusVal)
+                            s.blurRadiusVal = 0f
+                            vm.beginProxyPreview()
+                        }
+                    }
                 )
 
                 BottomPanel.SHARPEN_EDIT -> SharpenEditPanel(
                     amount = s.sharpenAmountVal,
                     onAmount = { s.sharpenAmountVal = it; vm.updateProxySharpen(it) },
                     onClose = { onClearAdjustGpuPreviewOnly(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applySharpenFast(s.sharpenAmountVal); s.activePanel = BottomPanel.DOCK }
+                    onApply = {
+                        if (s.sharpenAmountVal > 0.2f) {
+                            vm.applySharpenFast(s.sharpenAmountVal)
+                            s.sharpenAmountVal = 0f
+                            vm.beginProxyPreview()
+                        }
+                    }
                 )
                 BottomPanel.QUICK_ACTIONS_MENU -> QuickActionsPanel(
                     onClose = { vm.setTool(ActiveTool.NONE); s.activePanel = BottomPanel.DOCK },
@@ -1040,7 +1064,13 @@ internal fun StudioBottomPanelHost(
                         vm.updateProxyHslMixer(h, sat, l)
                     },
                     onClose = { s.hslTatActive = false; vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { s.hslTatActive = false; vm.applyHslMixer(s.hslHue, s.hslSat, s.hslLum); s.activePanel = BottomPanel.DOCK }
+                    onApply = {
+                        vm.applyHslMixer(s.hslHue, s.hslSat, s.hslLum)
+                        val keepTat = s.hslTatActive
+                        s.resetHslPro()
+                        s.hslTatActive = keepTat
+                        vm.beginProxyPreview()
+                    }
                 )
                 BottomPanel.POSTER_THRESH_LIVE -> PosterThreshPanel(
                     isPoster = s.posterMode,
@@ -1082,14 +1112,12 @@ internal fun StudioBottomPanelHost(
                     },
                     onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = {
-                        if (!s.posterTouched) {
-                            vm.endProxyPreview()
-                        } else if (s.posterMode) {
-                            vm.applyAdjustmentOnce("posterize", """{"levels":${s.posterLevels.roundToInt()}}""", "Posterize")
-                        } else {
-                            vm.applyAdjustmentOnce("threshold", """{"level":${s.threshLevel.roundToInt()}}""", "Eşik")
+                        if (s.posterTouched) {
+                            if (s.posterMode) vm.applyAdjustmentOnce("posterize", """{"levels":${s.posterLevels.roundToInt()}}""", "Posterize")
+                            else vm.applyAdjustmentOnce("threshold", """{"level":${s.threshLevel.roundToInt()}}""", "Eşik")
+                            s.posterTouched = false
+                            vm.beginProxyPreview()
                         }
-                        s.activePanel = BottomPanel.DOCK
                     }
                 )
                 BottomPanel.AUTO_ENHANCE_MENU -> AutoEnhancePanel(
@@ -1104,7 +1132,10 @@ internal fun StudioBottomPanelHost(
                     grain = s.cinemaGrain, onGrain = { s.cinemaGrain = it },
                     onPreview = { vm.updateProxyCinemaLook(s.cinemaPreset, s.cinemaIntensity, s.cinemaVignette, s.cinemaGrain) },
                     onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applyCinemaLook(s.cinemaPreset, s.cinemaIntensity, s.cinemaVignette, s.cinemaGrain); s.activePanel = BottomPanel.DOCK }
+                    onApply = {
+                        vm.applyCinemaLook(s.cinemaPreset, s.cinemaIntensity, s.cinemaVignette, s.cinemaGrain)
+                        vm.beginProxyPreview()
+                    }
                 )
                 BottomPanel.FILTER_GALLERY_EDIT -> FilterGalleryPanel(
                     thumbs = galleryThumbs,
@@ -1125,9 +1156,11 @@ internal fun StudioBottomPanelHost(
                     },
                     onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = { lbl ->
-                        if (s.galleryKind == "none") vm.endProxyPreview()
-                        else vm.applyGalleryFilter(s.galleryKind, s.galleryAmount, s.galleryDetail, lbl)
-                        s.activePanel = BottomPanel.DOCK
+                        if (s.galleryKind != "none") {
+                            vm.applyGalleryFilter(s.galleryKind, s.galleryAmount, s.galleryDetail, lbl)
+                            s.galleryKind = "none"
+                            vm.beginProxyPreview()
+                        }
                     }
                 )
                 BottomPanel.LIGHT_DISTORT_EDIT -> LightDistortPanel(
@@ -1172,9 +1205,11 @@ internal fun StudioBottomPanelHost(
                     },
                     onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = { lbl ->
-                        if (s.ldKind == "none") vm.endProxyPreview()
-                        else vm.applyLightDistort(s.ldKind, s.ldAmount, s.ldDetail, s.ldX, s.ldY, s.ldVariant, lbl)
-                        s.activePanel = BottomPanel.DOCK
+                        if (s.ldKind != "none") {
+                            vm.applyLightDistort(s.ldKind, s.ldAmount, s.ldDetail, s.ldX, s.ldY, s.ldVariant, lbl)
+                            s.ldKind = "none"
+                            vm.beginProxyPreview()
+                        }
                     }
                 )
                 BottomPanel.PUPPET_WARP_EDIT -> {
@@ -1269,12 +1304,13 @@ internal fun StudioBottomPanelHost(
                             s.activePanel = BottomPanel.DOCK
                         },
                         onApply = {
-                            vm.applyPuppetWarp(s.puppetPins, s.puppetMode, s.puppetDensity, s.puppetExpansion)
-                            s.puppetPins = emptyList()
-                            s.puppetSelectedIdx = -1
-                            s.puppetShowMesh = false
-                            s.puppetMeshSegments = emptyList()
-                            s.activePanel = BottomPanel.DOCK
+                            if (s.puppetPins.isNotEmpty()) {
+                                vm.applyPuppetWarp(s.puppetPins, s.puppetMode, s.puppetDensity, s.puppetExpansion)
+                                s.puppetPins = emptyList()
+                                s.puppetSelectedIdx = -1
+                                s.puppetMeshSegments = emptyList()
+                                vm.beginProxyPreview()
+                            }
                         }
                     )
                 }
@@ -1340,6 +1376,7 @@ internal fun StudioBottomPanelHost(
                         val th = s.resizeHeightText.toIntOrNull()?.coerceIn(16, 8192) ?: (state.docInfo?.height?.toInt() ?: 1080)
                         vm.resizeImage(tw, th, s.resizeResample)
                         s.activePanel = BottomPanel.DOCK
+                        s.activeWorkspaceV2 = s.lastWorkspaceV2
                     }
                 )
                 BottomPanel.MOTION_BLUR_EDIT -> MotionBlurPanel(
@@ -1348,9 +1385,11 @@ internal fun StudioBottomPanelHost(
                     onPreview = { vm.updateProxyMotionBlur(s.motionBlurAngle, s.motionBlurDistance) },
                     onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = {
-                        if (s.motionBlurDistance < 1f) vm.endProxyPreview()
-                        else vm.applyMotionBlur(s.motionBlurAngle, s.motionBlurDistance)
-                        s.activePanel = BottomPanel.DOCK
+                        if (s.motionBlurDistance >= 1f) {
+                            vm.applyMotionBlur(s.motionBlurAngle, s.motionBlurDistance)
+                            s.motionBlurDistance = 0f
+                            vm.beginProxyPreview()
+                        }
                     }
                 )
                 BottomPanel.RADIAL_BLUR_EDIT -> RadialBlurPanel(
@@ -1359,9 +1398,11 @@ internal fun StudioBottomPanelHost(
                     onPreview = { vm.updateProxyRadialBlur(s.radialBlurAmount, s.radialBlurMethod) },
                     onClose = { vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
                     onApply = {
-                        if (s.radialBlurAmount < 1f) vm.endProxyPreview()
-                        else vm.applyRadialBlur(s.radialBlurAmount, s.radialBlurMethod)
-                        s.activePanel = BottomPanel.DOCK
+                        if (s.radialBlurAmount >= 1f) {
+                            vm.applyRadialBlur(s.radialBlurAmount, s.radialBlurMethod)
+                            s.radialBlurAmount = 0f
+                            vm.beginProxyPreview()
+                        }
                     }
                 )
                 BottomPanel.LIQUIFY_EDIT -> LiquifyEditPanel(
@@ -1375,7 +1416,13 @@ internal fun StudioBottomPanelHost(
                     onMaskAction = { vm.liquifyMaskAction(it) },
                     onReset = { s.liquifyReconstructPct = 0f; s.liquifyLassoPoints = emptyList(); vm.resetLiquify() },
                     onClose = { vm.cancelLiquify(); s.liquifyCursorScreen = null; s.liquifyLassoPoints = emptyList(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { s.liquifyCursorScreen = null; s.liquifyLassoPoints = emptyList(); vm.commitLiquify(); s.activePanel = BottomPanel.DOCK }
+                    onApply = {
+                        s.liquifyCursorScreen = null
+                        s.liquifyLassoPoints = emptyList()
+                        s.liquifyReconstructPct = 0f
+                        vm.commitLiquify()
+                        vm.beginLiquify()
+                    }
                 )
                 BottomPanel.EFFECT_MENU -> {
                     Row(
@@ -1456,7 +1503,7 @@ internal fun StudioBottomPanelHost(
                                 val modeId = s.selectedMirrorMode.id
                                 val ratio = s.mirrorAxisRatio
                                 vm.applyPhotoMirror(modeId, ratio)
-                                s.activePanel = BottomPanel.DOCK
+                                onClearGpuPreview()
                             }
                         )
                         Row(
@@ -1530,6 +1577,7 @@ internal fun StudioBottomPanelHost(
                             onApply = {
                                 vm.transformActiveLayerXY(s.layerDx, s.layerDy, s.layerScaleXPct, s.layerScaleYPct, s.layerRotDeg)
                                 s.activePanel = BottomPanel.DOCK
+                                s.activeWorkspaceV2 = s.lastWorkspaceV2
                             }
                         )
                         Row(
@@ -1592,7 +1640,7 @@ internal fun StudioBottomPanelHost(
                         },
                         onApply = { json ->
                             vm.applyLayerStyleStack(json)
-                            s.activePanel = BottomPanel.DOCK
+                            vm.beginProxyPreview()
                         }
                     )
                 }
@@ -1657,7 +1705,7 @@ internal fun StudioBottomPanelHost(
                                 s.blendIfUnderWhite.roundToInt(),
                                 s.blendIfFeather.roundToInt()
                             )
-                            s.activePanel = BottomPanel.DOCK
+                            vm.beginProxyPreview()
                         }
                     )
                 }
@@ -1673,6 +1721,7 @@ internal fun StudioBottomPanelHost(
                     onApply = {
                         vm.applyLensCorrection(s.lensDistortion, s.lensVignette, s.lensRedCyan, s.lensBlueYellow, s.lensVertical, s.lensHorizontal)
                         s.activePanel = BottomPanel.DOCK
+                        s.activeWorkspaceV2 = s.lastWorkspaceV2
                     }
                 )
                 BottomPanel.LUT_IMPORT_EDIT -> CubeLutPanel(
@@ -1687,10 +1736,8 @@ internal fun StudioBottomPanelHost(
                     onApply = {
                         if (s.lutText.isNotBlank()) {
                             vm.applyColorLookup(s.lutFileName, s.lutText, s.lutOpacity)
-                        } else {
-                            vm.endProxyPreview()
+                            vm.beginProxyPreview()
                         }
-                        s.activePanel = BottomPanel.DOCK
                     }
                 )
                 BottomPanel.CONTENT_AWARE_FILL_EDIT -> ContentAwareFillPanel(
@@ -1720,6 +1767,7 @@ internal fun StudioBottomPanelHost(
                             s.cafScale, s.cafMirror, s.cafSampleAllLayers, s.cafOutput, strokes
                         )
                         s.activePanel = BottomPanel.DOCK
+                        s.activeWorkspaceV2 = s.lastWorkspaceV2
                     }
                 )
                 BottomPanel.CONTENT_AWARE_MOVE_EDIT -> ContentAwareMovePanel(
@@ -1745,6 +1793,7 @@ internal fun StudioBottomPanelHost(
                             s.camMoveScale, s.camMoveRotate, s.camMoveSampleAll
                         )
                         s.activePanel = BottomPanel.DOCK
+                        s.activeWorkspaceV2 = s.lastWorkspaceV2
                     }
                 )
                 BottomPanel.CONTENT_AWARE_SCALE_EDIT -> ContentAwareScalePanel(
@@ -1766,6 +1815,7 @@ internal fun StudioBottomPanelHost(
                         s.casBrushActive = false; s.casProtectStrokes = emptyList(); s.casActiveScreenStroke = emptyList()
                         vm.applyContentAwareScalePro(s.casScaleX, s.casScaleY, s.casAmount, s.casProtectSkinTones, strokes)
                         s.activePanel = BottomPanel.DOCK
+                        s.activeWorkspaceV2 = s.lastWorkspaceV2
                     }
                 )
                 BottomPanel.SELECT_COLOR_RANGE_EDIT -> ColorRangePanel(
@@ -1824,7 +1874,7 @@ internal fun StudioBottomPanelHost(
                         vm.updateProxyAdjustment("blackWhite", s.buildBwProJson())
                     },
                     onClose = { onClearAdjustGpuPreviewOnly(); vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applyAdjustmentOnce("blackWhite", s.buildBwProJson(), "Siyah-Beyaz Pro"); s.activePanel = BottomPanel.DOCK }
+                    onApply = { vm.applyAdjustmentOnce("blackWhite", s.buildBwProJson(), "Siyah-Beyaz Pro"); s.resetBwPro(); vm.beginProxyPreview() }
                 )
                 BottomPanel.PHOTO_FILTER_EDIT -> PhotoFilterProPanel(
                     s = s,
@@ -1834,7 +1884,7 @@ internal fun StudioBottomPanelHost(
                         vm.updateProxyAdjustment("photoFilter", s.buildPhotoFilterJson())
                     },
                     onClose = { onClearAdjustGpuPreviewOnly(); vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applyAdjustmentOnce("photoFilter", s.buildPhotoFilterJson(), "Fotoğraf Filtresi"); s.activePanel = BottomPanel.DOCK }
+                    onApply = { vm.applyAdjustmentOnce("photoFilter", s.buildPhotoFilterJson(), "Fotoğraf Filtresi"); s.resetPhotoFilterPro(); vm.beginProxyPreview() }
                 )
                 BottomPanel.SELECTIVE_COLOR_EDIT -> SelectiveColorProPanel(
                     s = s,
@@ -1844,7 +1894,7 @@ internal fun StudioBottomPanelHost(
                         vm.resetProxyPreview()
                     },
                     onClose = { onClearAdjustGpuPreviewOnly(); vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applyAdjustmentOnce("selectiveColor", s.buildSelectiveColorJson(), "Seçici Renk"); s.activePanel = BottomPanel.DOCK }
+                    onApply = { vm.applyAdjustmentOnce("selectiveColor", s.buildSelectiveColorJson(), "Seçici Renk"); s.resetSelectiveColorPro(); vm.beginProxyPreview() }
                 )
                 BottomPanel.CHANNEL_MIXER_EDIT -> ChannelMixerProPanel(
                     s = s,
@@ -1854,7 +1904,7 @@ internal fun StudioBottomPanelHost(
                         vm.resetProxyPreview()
                     },
                     onClose = { onClearAdjustGpuPreviewOnly(); vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applyAdjustmentOnce("channelMixer", s.buildChannelMixerJson(), "Kanal Karıştırıcı"); s.activePanel = BottomPanel.DOCK }
+                    onApply = { vm.applyAdjustmentOnce("channelMixer", s.buildChannelMixerJson(), "Kanal Karıştırıcı"); s.resetChannelMixerPro(); vm.beginProxyPreview() }
                 )
                 BottomPanel.GRADIENT_MAP_EDIT -> GradientMapProPanel(
                     s = s,
@@ -1864,7 +1914,7 @@ internal fun StudioBottomPanelHost(
                         vm.updateProxyAdjustment("gradientMap", s.buildGradientMapJson())
                     },
                     onClose = { onClearAdjustGpuPreviewOnly(); vm.endProxyPreview(); s.activePanel = BottomPanel.DOCK; s.activeWorkspaceV2 = s.lastWorkspaceV2 },
-                    onApply = { vm.applyAdjustmentOnce("gradientMap", s.buildGradientMapJson(), "Degrade Eşleme"); s.activePanel = BottomPanel.DOCK }
+                    onApply = { vm.applyAdjustmentOnce("gradientMap", s.buildGradientMapJson(), "Degrade Eşleme"); s.resetGradientMapPro(); vm.beginProxyPreview() }
                 )
                 else -> Unit
             }
