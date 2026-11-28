@@ -6389,7 +6389,7 @@ impl KastamonuEngine {
     ) -> Result<(), EngineError> {
         let clamped_size = size.clamp(1.0, 1000.0);
         let adaptive_spacing = if clamped_size > 180.0 {
-            0.28
+            0.36
         } else if clamped_size > 100.0 {
             0.22
         } else if clamped_size > 50.0 {
@@ -6453,7 +6453,7 @@ impl KastamonuEngine {
             is_eraser,
             is_pencil: false,
             target_mask,
-            size: size.clamp(1.0, 400.0),
+            size: guard.session.tools.brush.size.clamp(1.0, 400.0),
         });
         guard.mark_region_dirty(dmg);
         Ok(())
@@ -8815,7 +8815,7 @@ impl KastamonuEngine {
             is_eraser: false,
             is_pencil: true,
             target_mask: false,
-            size: size.clamp(1.0, 400.0),
+            size: guard.session.tools.brush.size.clamp(1.0, 400.0),
         });
         guard.mark_region_dirty(dmg);
         Ok(())
