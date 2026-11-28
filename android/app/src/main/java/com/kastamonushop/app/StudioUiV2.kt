@@ -147,6 +147,7 @@ internal fun StudioWorkspaceSheetV2(
     workspace: StudioWorkspace,
     pinnedIds: Set<String>,
     gridState: androidx.compose.foundation.lazy.grid.LazyGridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
+    initialGroup: String = "Tümü",
     onTogglePin: (String) -> Unit,
     onSelectTool: (StudioToolSpec) -> Unit,
     onDismiss: () -> Unit,
@@ -154,7 +155,7 @@ internal fun StudioWorkspaceSheetV2(
 ) {
     val haptic = LocalHapticFeedback.current
     val groups = remember(workspace) { ToolRegistryV2.groupsFor(workspace) }
-    var selectedGroup by remember(workspace) { mutableStateOf("Tümü") }
+    var selectedGroup by remember(workspace, initialGroup) { mutableStateOf(initialGroup) }
 
     val tools = remember(workspace, selectedGroup, pinnedIds) {
         val base = ToolRegistryV2.toolsFor(workspace)

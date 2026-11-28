@@ -3002,7 +3002,7 @@ fun StonebridgeStudioScreen(
 
         // Studio v2.0 Frosted-Glass Workspace Sheet (opens cleanly above fixed 4+1 dock)
         val openWs = s.activeWorkspaceV2
-        if (openWs != null && s.activePanel == BottomPanel.DOCK) {
+        if (openWs != null && (s.activePanel == BottomPanel.DOCK || s.activePanel == BottomPanel.DRAW_MENU || s.activePanel == BottomPanel.RETOUCH_MENU)) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -3016,6 +3016,11 @@ fun StonebridgeStudioScreen(
                 workspace = openWs,
                 pinnedIds = s.pinnedToolIdsV2,
                 gridState = s.workspaceGridStates[openWs] ?: androidx.compose.foundation.lazy.grid.rememberLazyGridState(),
+                initialGroup = when {
+                    openWs == StudioWorkspace.DRAW && s.activePanel == BottomPanel.DRAW_MENU -> "Çizim"
+                    openWs == StudioWorkspace.DRAW && s.activePanel == BottomPanel.RETOUCH_MENU -> "Rötuş & Onarım"
+                    else -> "Tümü"
+                },
                 onTogglePin = { id ->
                     s.pinnedToolIdsV2 = if (id in s.pinnedToolIdsV2) s.pinnedToolIdsV2 - id else s.pinnedToolIdsV2 + id
                 },
